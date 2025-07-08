@@ -1,0 +1,106 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ogre Jump Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; font-family: sans-serif; background: #87ceeb; }
+    canvas { display: block; background: url('background.png') repeat-x; background-size: cover; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+<audio id="bgMusic" src="music.mp3" autoplay loop></audio>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const ogreImg = new Image();
+ogreImg.src = "ogre.png";
+
+let ogre = {
+  x: 50,
+  y: 300,
+  width: 70,
+  height: 70,
+  vy: 0,
+  gravity: 1.5,
+  jumpPower: -15,
+  grounded: true
+};
+
+let obstacles = [
+  { x: 600, y: 330, width: 30, height: 70 },
+  { x: 1000, y: 350, width: 30, height: 50 }
+];
+
+let smoke = [];
+
+function drawOgre() {
+  ctx.drawImage(ogreImg, ogre.x, ogre.y, ogre.width, ogre.height);
+}
+
+function drawObstacles() {
+  ctx.fillStyle = "#333";
+  for (let obs of obstacles) {
+    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+  }
+}
+
+function drawSmoke() {
+  ctx.fillStyle = "rgba(0,255,0,0.6)";
+  for (let s of smoke) {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function update() {
+  ogre.vy += ogre.gravity;
+  ogre.y += ogre.vy;
+
+  if (ogre.y > 300) {
+    ogre.y = 300;
+    ogre.vy = 0;
+    ogre.grounded = true;
+  }
+
+  for (let obs of obstacles) {
+    obs.x -= 5;
+    if (obs.x + obs.width < 0) {
+      obs.x = 800 + Math.random() * 300;
+    }
+  }
+
+  for (let s of smoke) {
+    s.x -= 3;
+    s.radius -= 0.1;
+  }
+  smoke = smoke.filter(s => s.radius > 0);
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  update();
+  drawObstacles();
+  drawOgre();
+  drawSmoke();
+  requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && ogre.grounded) {
+    ogre.vy = ogre.jumpPower;
+    ogre.grounded = false;
+    smoke.push({ x: ogre.x, y: ogre.y + ogre.height - 10, radius: 15 });
+  }
+});
+
+gameLoop();
+</script>
+</body>
+</html>
