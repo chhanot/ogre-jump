@@ -29,7 +29,6 @@
 <div id="score">0 m</div>
 <canvas id="gameCanvas"></canvas>
 <audio id="bgMusic" src="music.mp3" loop></audio>
-<audio id="petSound" src="pet.mp3" loop></audio>
 <audio id="collisionSound" src="collision.mp3"></audio>
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -44,13 +43,25 @@ bgImg.src = "background.png";
 const ogreImg = new Image();
 ogreImg.src = "ogre_normal.png";
 
-const petSound = document.getElementById("petSound");
 const collisionSound = document.getElementById("collisionSound");
 const bgMusic = document.getElementById("bgMusic");
 
 bgMusic.play().catch(() => {
   document.body.addEventListener('click', () => bgMusic.play(), { once: true });
 });
+
+const fartSounds = [
+  new Audio("pet_variant_1.mp3"),
+  new Audio("pet_variant_2.mp3"),
+  new Audio("pet_variant_3.mp3"),
+  new Audio("pet_variant_4.mp3"),
+];
+
+function playRandomFart() {
+  const fart = fartSounds[Math.floor(Math.random() * fartSounds.length)];
+  fart.currentTime = 0;
+  fart.play();
+}
 
 let width = canvas.width;
 let height = canvas.height;
@@ -68,6 +79,7 @@ let ogre = {
 
 let keys = {};
 let keyPressed = false;
+let keyPressedLastFrame = false;
 let obstacles = [];
 let airborneObstacles = [];
 let smoke = [];
@@ -112,22 +124,19 @@ function update() {
 
   if (keyPressed) {
     ogre.vy += ogre.jetpackPower;
-    if (petSound.paused) petSound.play();
+    if (!keyPressedLastFrame) playRandomFart();
     smoke.push({ x: ogre.x + 15, y: ogre.y + ogre.height - 10, radius: 10 });
   }
 
   ogre.vy += ogre.gravity;
   ogre.y += ogre.vy;
 
-  // Collisions haut et bas
   if (ogre.y > groundLevel - ogre.height) {
     ogre.y = groundLevel - ogre.height;
     ogre.vy = 0;
   } else if (ogre.y <= 0) {
     ogre.y = 0;
     gameOver = true;
-    petSound.pause();
-    petSound.currentTime = 0;
     collisionSound.play();
     return;
   }
@@ -162,8 +171,6 @@ function update() {
     ) {
       collisionSound.play();
       gameOver = true;
-      petSound.pause();
-      petSound.currentTime = 0;
       return;
     }
   }
@@ -181,6 +188,8 @@ function update() {
 
   bgScrollX -= speed / 2;
   if (bgScrollX <= -bgImg.width) bgScrollX = 0;
+
+  keyPressedLastFrame = keyPressed;
 }
 
 function draw() {
@@ -232,8 +241,6 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => {
   if (e.key === " " || e.key === "Spacebar") {
     keyPressed = false;
-    petSound.pause();
-    petSound.currentTime = 0;
   }
 });
 
