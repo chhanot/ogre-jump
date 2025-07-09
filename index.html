@@ -46,7 +46,17 @@ ogreImg.src = "ogre_normal.png";
 const collisionSound = document.getElementById("collisionSound");
 const bgMusic = document.getElementById("bgMusic");
 
+
+bgMusic.volume = 0.6;
+document.addEventListener('DOMContentLoaded', () => {
+  const playMusic = () => {
+    bgMusic.play().catch(() => {});
+    document.body.removeEventListener('click', playMusic);
+  };
+  document.body.addEventListener('click', playMusic);
+});
 bgMusic.play().catch(() => {
+
   document.body.addEventListener('click', () => bgMusic.play(), { once: true });
 });
 
@@ -57,10 +67,25 @@ const fartSounds = [
   new Audio("pet_variant_4.mp3"),
 ];
 
+// For stopping: keep track of the current one
+let currentFart = null;
+
 function playRandomFart() {
-  const fart = fartSounds[Math.floor(Math.random() * fartSounds.length)];
-  fart.currentTime = 0;
-  fart.play();
+  if (currentFart) {
+    currentFart.pause();
+    currentFart.currentTime = 0;
+  }
+  currentFart = fartSounds[Math.floor(Math.random() * fartSounds.length)];
+  currentFart.currentTime = 0;
+  currentFart.play();
+}
+
+function stopFart() {
+  if (currentFart) {
+    currentFart.pause();
+    currentFart.currentTime = 0;
+    currentFart = null;
+  }
 }
 
 let width = canvas.width;
@@ -74,10 +99,9 @@ let ogre = {
   height: 70,
   vy: 0,
   gravity: 1.2,
-  jetpackPower: -1.8
+  jetpackPower: -1.2
 };
 
-let keys = {};
 let keyPressed = false;
 let keyPressedLastFrame = false;
 let obstacles = [];
@@ -137,6 +161,7 @@ function update() {
   } else if (ogre.y <= 0) {
     ogre.y = 0;
     gameOver = true;
+    stopFart();
     collisionSound.play();
     return;
   }
@@ -170,6 +195,7 @@ function update() {
       ogreBox.y + ogreBox.height > obsBox.y
     ) {
       collisionSound.play();
+      stopFart();
       gameOver = true;
       return;
     }
@@ -241,6 +267,7 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => {
   if (e.key === " " || e.key === "Spacebar") {
     keyPressed = false;
+    stopFart();
   }
 });
 
