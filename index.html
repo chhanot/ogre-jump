@@ -5,14 +5,14 @@
   <meta charset="UTF-8" />
   <title>Ogre Jetpack Game</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; background: url('background.png') repeat-x; background-size: cover; }
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; }
     #score { position: absolute; top: 10px; left: 10px; font-size: 24px; color: white; text-shadow: 1px 1px 3px black; }
   </style>
 </head>
 <body>
 <div id="score">0 m</div>
-<canvas id="gameCanvas" width="800" height="400"></canvas>
+<canvas id="gameCanvas" width="1152" height="768"></canvas>
 <audio id="bgMusic" src="music.mp3" autoplay loop></audio>
 <audio id="petSound" src="pet.mp3"></audio>
 <audio id="collisionSound" src="collision.mp3"></audio>
@@ -20,6 +20,10 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreDiv = document.getElementById("score");
+
+const backgroundImg = new Image();
+backgroundImg.src = "background.png";
+
 const ogreImg = new Image();
 const ogrePetImg = new Image();
 ogreImg.src = "ogre_normal.png";
@@ -30,7 +34,7 @@ const collisionSound = document.getElementById("collisionSound");
 
 let ogre = {
   x: 80,
-  y: 300,
+  y: 600,
   width: 60,
   height: 60,
   vy: 0,
@@ -56,20 +60,19 @@ function spawnObstacle() {
   let img = new Image();
   let src = groundAnimals[Math.floor(Math.random() * groundAnimals.length)];
   img.src = src;
-  obstacles.push({ img, x: 800, y: 340, width: 50, height: 50, speed: speed * (0.8 + Math.random() * 0.5) });
+  obstacles.push({ img, x: canvas.width, y: 700, width: 50, height: 50, speed: speed * (0.8 + Math.random() * 0.5) });
 }
 
 function spawnFlying() {
   let img = new Image();
   let src = flyingEnemies[Math.floor(Math.random() * flyingEnemies.length)];
   img.src = src;
-  airborneObstacles.push({ img, x: 800, y: 100 + Math.random() * 100, width: 50, height: 50, speed: speed * (1 + Math.random() * 0.8) });
+  airborneObstacles.push({ img, x: canvas.width, y: 200 + Math.random() * 100, width: 50, height: 50, speed: speed * (1 + Math.random() * 0.8) });
 }
 
 function update() {
   if (gameOver) return;
 
-  // Jetpack logic
   if (keys[" "] || keys["Space"]) {
     ogre.vy += ogre.jetpackPower;
     ogre.petting = true;
@@ -81,25 +84,22 @@ function update() {
 
   ogre.vy += ogre.gravity;
   ogre.y += ogre.vy;
-  if (ogre.y > 340) {
-    ogre.y = 340;
+  if (ogre.y > 700) {
+    ogre.y = 700;
     ogre.vy = 0;
     ogre.grounded = true;
   } else {
     ogre.grounded = false;
   }
 
-  // Smoke trail update
   smoke = smoke.map(s => ({ ...s, x: s.x - 1, radius: s.radius - 0.2 })).filter(s => s.radius > 0);
 
-  // Obstacle movement
   for (let obs of [...obstacles, ...airborneObstacles]) {
     obs.x -= obs.speed;
   }
   obstacles = obstacles.filter(o => o.x + o.width > 0);
   airborneObstacles = airborneObstacles.filter(o => o.x + o.width > 0);
 
-  // Collision detection
   for (let obs of [...obstacles, ...airborneObstacles]) {
     if (
       ogre.x < obs.x + obs.width &&
@@ -113,31 +113,30 @@ function update() {
     }
   }
 
-  // Score and speed
-  distance += speed / 60 * 3; // 3m/s
+  distance += speed / 60 * 3;
   scoreDiv.textContent = Math.floor(distance) + " m";
 
   if (Math.floor(distance) % 100 === 0 && speed < maxSpeed) {
     speed += 0.2;
   }
 
-  // Spawning
   if (Math.random() < 0.02) spawnObstacle();
   if (Math.random() < 0.01) spawnFlying();
 }
 
 function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+
   if (gameOver) {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "white";
     ctx.font = "36px sans-serif";
-    ctx.fillText("Game Over!", 300, 180);
-    ctx.fillText("Score: " + Math.floor(distance) + " m", 290, 230);
+    ctx.fillText("Game Over!", 480, 350);
+    ctx.fillText("Score: " + Math.floor(distance) + " m", 460, 400);
     return;
   }
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let s of smoke) {
     ctx.fillStyle = "rgba(0,255,0,0.5)";
