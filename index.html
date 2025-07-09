@@ -28,8 +28,8 @@
 <body>
 <div id="score">0 m</div>
 <canvas id="gameCanvas"></canvas>
-<audio id="bgMusic" src="music.mp3" autoplay loop></audio>
-<audio id="petSound" src="pet.mp3"></audio>
+<audio id="bgMusic" src="music.mp3" loop></audio>
+<audio id="petSound" src="pet.mp3" loop></audio>
 <audio id="collisionSound" src="collision.mp3"></audio>
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -46,6 +46,11 @@ ogreImg.src = "ogre_normal.png";
 
 const petSound = document.getElementById("petSound");
 const collisionSound = document.getElementById("collisionSound");
+const bgMusic = document.getElementById("bgMusic");
+
+bgMusic.play().catch(() => {
+  document.body.addEventListener('click', () => bgMusic.play(), { once: true });
+});
 
 let width = canvas.width;
 let height = canvas.height;
@@ -62,6 +67,7 @@ let ogre = {
 };
 
 let keys = {};
+let keyPressed = false;
 let obstacles = [];
 let airborneObstacles = [];
 let smoke = [];
@@ -104,17 +110,26 @@ function spawnFlying() {
 function update() {
   if (gameOver) return;
 
-  if (keys[" "] || keys["Space"]) {
+  if (keyPressed) {
     ogre.vy += ogre.jetpackPower;
-    petSound.play();
+    if (petSound.paused) petSound.play();
     smoke.push({ x: ogre.x + 15, y: ogre.y + ogre.height - 10, radius: 10 });
   }
 
   ogre.vy += ogre.gravity;
   ogre.y += ogre.vy;
+
+  // Collisions haut et bas
   if (ogre.y > groundLevel - ogre.height) {
     ogre.y = groundLevel - ogre.height;
     ogre.vy = 0;
+  } else if (ogre.y <= 0) {
+    ogre.y = 0;
+    gameOver = true;
+    petSound.pause();
+    petSound.currentTime = 0;
+    collisionSound.play();
+    return;
   }
 
   smoke = smoke.map(s => ({ ...s, x: s.x - 1, radius: s.radius - 0.2 })).filter(s => s.radius > 0);
@@ -125,7 +140,6 @@ function update() {
   obstacles = obstacles.filter(o => o.x + o.width > 0);
   airborneObstacles = airborneObstacles.filter(o => o.x + o.width > 0);
 
-  // Refined collision box (80% of sprite, centered)
   const ogreBox = {
     x: ogre.x + ogre.width * 0.1,
     y: ogre.y + ogre.height * 0.1,
@@ -148,6 +162,8 @@ function update() {
     ) {
       collisionSound.play();
       gameOver = true;
+      petSound.pause();
+      petSound.currentTime = 0;
       return;
     }
   }
@@ -207,8 +223,20 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+document.addEventListener("keydown", e => {
+  if (e.key === " " || e.key === "Spacebar") {
+    keyPressed = true;
+  }
+});
+
+document.addEventListener("keyup", e => {
+  if (e.key === " " || e.key === "Spacebar") {
+    keyPressed = false;
+    petSound.pause();
+    petSound.currentTime = 0;
+  }
+});
+
 window.addEventListener("resize", () => location.reload());
 
 loop();
