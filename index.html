@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,61 +8,19 @@
     html, body { margin: 0; padding: 0; overflow: hidden; background: black; }
     canvas { display: block; }
 
-    #score, #countdown, #startMenu, #gameOverMenu {
-      position: absolute;
-      z-index: 10;
-      font-family: sans-serif;
-      text-align: center;
-    }
-
     #score {
+      position: absolute;
       top: 10px;
       left: 10px;
       font-size: 24px;
       color: white;
       text-shadow: 1px 1px 3px black;
-      display: none;
-    }
-
-    #countdown {
-      top: 40%;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 60px;
-      color: white;
-      display: none;
-    }
-
-    #startMenu, #gameOverMenu {
-      width: 100%;
-      top: 25%;
-      display: none;
-      color: white;
-    }
-
-    button {
-      font-size: 24px;
-      padding: 10px 20px;
-      margin-top: 20px;
-      cursor: pointer;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
 <div id="score">0 m</div>
-<div id="countdown"></div>
-
-<div id="startMenu">
-  <h1>💨 Farty Ogre</h1>
-  <button onclick="startGame()">Play</button>
-</div>
-
-<div id="gameOverMenu">
-  <h1>Game Over</h1>
-  <p id="finalScore"></p>
-  <p id="bestScore"></p>
-  <button onclick="restartGame()">Rejouer</button>
-</div>
 
 <canvas id="gameCanvas"></canvas>
 <audio id="bgMusic" src="music.mp3" loop></audio>
@@ -69,40 +28,17 @@
 <audio id="fart1" src="pet.mp3"></audio>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const scoreDiv = document.getElementById("score");
-const bgImg = new Image();
-bgImg.src = "background.png";
-
-const ogreImg = new Image();
-ogreImg.src = "ogre_normal.png";
-
-const collisionSound = document.getElementById("collisionSound");
-const bgMusic = document.getElementById("bgMusic");
-bgMusic.volume = 0.6;
-
-let fartSound = document.getElementById("fart1");
+let gameStarted = false;
+let gameOver = false;
+let countdownInterval;
 let currentFart = null;
+let fartSounds = [];
 
-function playFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-  }
-  currentFart = fartSound.cloneNode();
-  currentFart.play();
-}
-function stopFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-    currentFart = null;
-  }
-}
+document.addEventListener('DOMContentLoaded', () => {
+  fartSounds = [
+    document.getElementById("fart1"),
+  ];
+});
 
 let width = canvas.width;
 let height = canvas.height;
@@ -126,10 +62,7 @@ let smoke = [];
 let speed = 3;
 let maxSpeed = 9;
 let distance = 0;
-let gameOver = false;
 let maxObstacles = 1;
-let gameStarted = false;
-let countdownInterval;
 
 const groundLevel = height - 80;
 const groundAnimals = [
@@ -144,6 +77,32 @@ const flyingEnemies = [
   { name: "pigeon_armure.png", width: 40, height: 40 },
   { name: "dragon.png", width: 120, height: 80 }
 ];
+
+const bgImg = new Image();
+bgImg.src = "background.png";
+const ogreImg = new Image();
+ogreImg.src = "ogre_normal.png";
+const collisionSound = document.getElementById("collisionSound");
+const bgMusic = document.getElementById("bgMusic");
+bgMusic.volume = 0.6;
+
+let fartSound = document.getElementById("fart1");
+
+function playFart() {
+  if (currentFart) {
+    currentFart.pause();
+    currentFart.currentTime = 0;
+  }
+  currentFart = fartSound.cloneNode();
+  currentFart.play();
+}
+function stopFart() {
+  if (currentFart) {
+    currentFart.pause();
+    currentFart.currentTime = 0;
+    currentFart = null;
+  }
+}
 
 function spawnObstacle() {
   if (obstacles.length + airborneObstacles.length >= maxObstacles) return;
@@ -297,6 +256,16 @@ document.addEventListener("keyup", e => {
   }
 });
 
+function endGame() {
+  scoreDiv.style.display = "none";
+  document.getElementById("gameOverMenu").style.display = "block";
+  const current = Math.floor(distance);
+  const best = Math.max(current, parseInt(localStorage.getItem("bestScore") || "0"));
+  localStorage.setItem("bestScore", best);
+  document.getElementById("finalScore").textContent = "Score: " + current + " m";
+  document.getElementById("bestScore").textContent = "Meilleur score: " + best + " m";
+}
+
 function startGame() {
   document.getElementById("startMenu").style.display = "none";
   const countdown = document.getElementById("countdown");
@@ -315,26 +284,12 @@ function startGame() {
       scoreDiv.style.display = "block";
       gameStarted = true;
       bgMusic.play();
+      loop();  // Start game loop
     }
   }, 1000);
 }
 
-function endGame() {
-  scoreDiv.style.display = "none";
-  document.getElementById("gameOverMenu").style.display = "block";
-  const current = Math.floor(distance);
-  const best = Math.max(current, parseInt(localStorage.getItem("bestScore") || "0"));
-  localStorage.setItem("bestScore", best);
-  document.getElementById("finalScore").textContent = "Score: " + current + " m";
-  document.getElementById("bestScore").textContent = "Meilleur score: " + best + " m";
-}
-
-function restartGame() {
-  location.reload();
-}
-
 window.addEventListener("resize", () => location.reload());
-loop();
 </script>
 </body>
 </html>
