@@ -3,282 +3,116 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Ogre Jetpack Game</title>
+  <title>Farty Ogre</title>
   <style>
     html, body { margin: 0; padding: 0; overflow: hidden; background: black; }
     canvas { display: block; }
-    #score {
+
+    #score, #countdown, #startMenu, #gameOverMenu {
       position: absolute;
+      z-index: 10;
+      font-family: sans-serif;
+      text-align: center;
+    }
+
+    #score {
       top: 10px;
       left: 10px;
       font-size: 24px;
       color: white;
       text-shadow: 1px 1px 3px black;
-      z-index: 10;
+    }
+
+    #countdown {
+      top: 40%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 60px;
+      color: white;
+      display: none;
+    }
+
+    #startMenu, #gameOverMenu {
+      width: 100%;
+      top: 30%;
+      display: none;
+      color: white;
+    }
+
+    button {
+      font-size: 24px;
+      padding: 10px 20px;
+      margin-top: 20px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 <div id="score">0 m</div>
+<div id="countdown"></div>
+
+<div id="startMenu">
+  <h1>💨 Farty Ogre</h1>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div id="gameOverMenu">
+  <h1>Game Over</h1>
+  <p id="finalScore"></p>
+  <p id="bestScore"></p>
+  <button onclick="restartGame()">Rejouer</button>
+</div>
+
 <canvas id="gameCanvas"></canvas>
 <audio id="bgMusic" src="music.mp3" loop></audio>
 <audio id="collisionSound" src="collision.mp3"></audio>
+<audio id="fart1" src="pet_variant_1.mp3"></audio>
+<audio id="fart2" src="pet_variant_2.mp3"></audio>
+<audio id="fart3" src="pet_variant_3.mp3"></audio>
+<audio id="fart4" src="pet_variant_4.mp3"></audio>
+
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const scoreDiv = document.getElementById("score");
-const bgImg = new Image();
-bgImg.src = "background.png";
-
-const ogreImg = new Image();
-ogreImg.src = "ogre_normal.png";
-
-const collisionSound = document.getElementById("collisionSound");
-const bgMusic = document.getElementById("bgMusic");
-bgMusic.volume = 0.6;
-document.addEventListener('DOMContentLoaded', () => {
-  const playMusic = () => {
-    bgMusic.play().catch(() => {});
-    document.body.removeEventListener('click', playMusic);
-  };
-  document.body.addEventListener('click', playMusic);
-});
-bgMusic.play().catch(() => {});
-
-const fartSounds = [
-  new Audio("pet_variant_1.mp3"),
-  new Audio("pet_variant_2.mp3"),
-  new Audio("pet_variant_3.mp3"),
-  new Audio("pet_variant_4.mp3")
-];
-let currentFart = null;
-
-function playRandomFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-  }
-  currentFart = fartSounds[Math.floor(Math.random() * fartSounds.length)];
-  currentFart.currentTime = 0;
-  currentFart.play();
-}
-function stopFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-    currentFart = null;
-  }
-}
-
-let width = canvas.width;
-let height = canvas.height;
-let bgScrollX = 0;
-
-let ogre = {
-  x: 80,
-  y: height - 150,
-  width: 70,
-  height: 70,
-  vy: 0,
-  gravity: 1.2,
-  jetpackPower: -1.8
-};
-
-let keyPressed = false;
-let keyPressedLastFrame = false;
-let obstacles = [];
-let airborneObstacles = [];
-let smoke = [];
-let speed = 3;
-let maxSpeed = 9;
-let distance = 0;
+let gameStarted = false;
 let gameOver = false;
-let maxObstacles = 1;
+let countdownInterval;
+let currentFart = null;
+let fartSounds = [];
 
-const groundLevel = height - 80;
-const groundAnimals = [
-  { name: "boeuf.png", width: 90, height: 60 },
-  { name: "cheval.png", width: 90, height: 60 },
-  { name: "ane.png", width: 80, height: 55 },
-  { name: "poule.png", width: 30, height: 30 },
-  { name: "cochon.png", width: 50, height: 35 },
-  { name: "chariot.png", width: 120, height: 50 }
-];
-const flyingEnemies = [
-  { name: "pigeon_armure.png", width: 40, height: 40 },
-  { name: "dragon.png", width: 120, height: 80 }
-];
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById("startMenu").style.display = "block";
+  fartSounds = [
+    document.getElementById("fart1"),
+    document.getElementById("fart2"),
+    document.getElementById("fart3"),
+    document.getElementById("fart4"),
+  ];
+});
 
-function spawnObstacle() {
-  if (obstacles.length + airborneObstacles.length >= maxObstacles) return;
-  let obj = groundAnimals[Math.floor(Math.random() * groundAnimals.length)];
-  let img = new Image();
-  img.src = obj.name;
-  obstacles.push({
-    img,
-    x: width,
-    y: groundLevel - obj.height * 1.4,
-    width: obj.width * 1.4,
-    height: obj.height * 1.4,
-    speed: speed * (0.8 + Math.random() * 0.5)
-  });
-}
+function startGame() {
+  document.getElementById("startMenu").style.display = "none";
+  let count = 3;
+  const countdown = document.getElementById("countdown");
+  countdown.style.display = "block";
+  countdown.textContent = count;
 
-function spawnFlying() {
-  if (obstacles.length + airborneObstacles.length >= maxObstacles) return;
-  let obj = flyingEnemies[Math.floor(Math.random() * flyingEnemies.length)];
-  let img = new Image();
-  img.src = obj.name;
-  let scale = obj.name.includes("pigeon") ? 1 : 1.4;
-  airborneObstacles.push({
-    img,
-    x: width,
-    y: 100 + Math.random() * (canvas.height / 2 - 100),
-    width: obj.width * scale,
-    height: obj.height * scale,
-    speed: speed * (1 + Math.random() * 0.5)
-  });
-}
-
-function update() {
-  if (gameOver) return;
-
-  if (keyPressed) {
-    ogre.vy += ogre.jetpackPower;
-    if (!keyPressedLastFrame) playRandomFart();
-    smoke.push({ x: ogre.x + 15, y: ogre.y + ogre.height - 10, radius: 10 });
-  }
-
-  ogre.vy += ogre.gravity;
-  ogre.y += ogre.vy;
-
-  if (ogre.y > groundLevel - ogre.height) {
-    ogre.y = groundLevel - ogre.height;
-    ogre.vy = 0;
-  } else if (ogre.y <= 0) {
-    ogre.y = 0;
-    gameOver = true;
-    stopFart();
-    collisionSound.play();
-    return;
-  }
-
-  smoke = smoke.map(s => ({ ...s, x: s.x - 1, radius: s.radius - 0.2 })).filter(s => s.radius > 0);
-
-  for (let obs of [...obstacles, ...airborneObstacles]) {
-    obs.x -= obs.speed;
-  }
-  obstacles = obstacles.filter(o => o.x + o.width > 0);
-  airborneObstacles = airborneObstacles.filter(o => o.x + o.width > 0);
-
-  const ogreBox = {
-    x: ogre.x + ogre.width * 0.1,
-    y: ogre.y + ogre.height * 0.1,
-    width: ogre.width * 0.8,
-    height: ogre.height * 0.8
-  };
-
-  for (let obs of [...obstacles, ...airborneObstacles]) {
-    const obsBox = {
-      x: obs.x + obs.width * 0.1,
-      y: obs.y + obs.height * 0.1,
-      width: obs.width * 0.8,
-      height: obs.height * 0.8
-    };
-    if (
-      ogreBox.x < obsBox.x + obsBox.width &&
-      ogreBox.x + ogreBox.width > obsBox.x &&
-      ogreBox.y < obsBox.y + obsBox.height &&
-      ogreBox.y + ogreBox.height > obsBox.y
-    ) {
-      collisionSound.play();
-      stopFart();
-      gameOver = true;
-      return;
-    }
-  }
-
-  distance += speed / 60 * 3;
-  scoreDiv.textContent = Math.floor(distance) + " m";
-
-  const milestone = Math.floor(distance / 100);
-  if (distance - milestone * 100 < speed / 60 * 3) {
-    if (speed < maxSpeed) speed += 0.2;
-    if (milestone <= 10) {
-      maxObstacles = Math.min(1 + milestone, 10);
-    }
-  }
-
-  // Obstacle spawn logic
-  if (Math.random() < 0.02) {
-    const ratio = Math.min(distance / 1000, 1) * 0.5;
-    if (Math.random() < ratio) {
-      spawnFlying();
+  countdownInterval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      countdown.textContent = count;
+    } else if (count === 0) {
+      countdown.textContent = "GO!";
     } else {
-      spawnObstacle();
+      clearInterval(countdownInterval);
+      countdown.style.display = "none";
+      gameStarted = true;
+      bgMusic.play();
     }
-  }
-
-  bgScrollX -= speed / 2;
-  if (bgScrollX <= -bgImg.width) bgScrollX = 0;
-
-  keyPressedLastFrame = keyPressed;
+  }, 1000);
 }
 
-function draw() {
-  ctx.clearRect(0, 0, width, height);
-  if (bgImg.complete) {
-    ctx.drawImage(bgImg, bgScrollX, 0, bgImg.width, height);
-    ctx.drawImage(bgImg, bgScrollX + bgImg.width, 0, bgImg.width, height);
-  }
-
-  if (gameOver) {
-    ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.font = "36px sans-serif";
-    ctx.fillText("Game Over!", width / 2 - 100, height / 2 - 20);
-    ctx.fillText("Score: " + Math.floor(distance) + " m", width / 2 - 100, height / 2 + 20);
-    return;
-  }
-
-  for (let s of smoke) {
-    ctx.fillStyle = "rgba(85,153,68,0.5)";
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.drawImage(ogreImg, ogre.x, ogre.y, ogre.width, ogre.height);
-  for (let obs of obstacles) {
-    ctx.drawImage(obs.img, obs.x, obs.y, obs.width, obs.height);
-  }
-  for (let obs of airborneObstacles) {
-    ctx.drawImage(obs.img, obs.x, obs.y, obs.width, obs.height);
-  }
+function restartGame() {
+  window.location.reload();
 }
-
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
-document.addEventListener("keydown", e => {
-  if (e.key === " " || e.key === "Spacebar") keyPressed = true;
-});
-document.addEventListener("keyup", e => {
-  if (e.key === " " || e.key === "Spacebar") {
-    keyPressed = false;
-    stopFart();
-  }
-});
-window.addEventListener("resize", () => location.reload());
-
-loop();
 </script>
 </body>
 </html>
