@@ -24,19 +24,27 @@
 
 <canvas id="gameCanvas"></canvas>
 <audio id="bgMusic" src="music.mp3" loop></audio>
+<audio id="petSound" src="pet.mp3" loop></audio>
 <audio id="collisionSound" src="collision.mp3"></audio>
-<audio id="fart1" src="pet.mp3"></audio>
-
 <script>
-let gameStarted = true;
-let gameOver = false;
-let currentFart = null;
-let fartSounds = [];
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-document.addEventListener('DOMContentLoaded', () => {
-  fartSounds = [
-    document.getElementById("fart1"),
-  ];
+const scoreDiv = document.getElementById("score");
+const bgImg = new Image();
+bgImg.src = "background.png";
+
+const ogreImg = new Image();
+ogreImg.src = "ogre_normal.png";
+
+const petSound = document.getElementById("petSound");
+const collisionSound = document.getElementById("collisionSound");
+const bgMusic = document.getElementById("bgMusic");
+
+bgMusic.play().catch(() => {
+  document.body.addEventListener('click', () => bgMusic.play(), { once: true });
 });
 
 let width = canvas.width;
@@ -53,15 +61,17 @@ let ogre = {
   jetpackPower: -1.8
 };
 
+let keys = {};
 let keyPressed = false;
-let keyPressedLastFrame = false;
 let obstacles = [];
 let airborneObstacles = [];
 let smoke = [];
 let speed = 3;
-let maxSpeed = 9;
+let maxSpeed = 15;  // Increased max speed to 5x the initial speed
 let distance = 0;
+let gameOver = false;
 let maxObstacles = 1;
+let airborneProportion = 0;
 
 const groundLevel = height - 80;
 const groundAnimals = [
@@ -77,45 +87,15 @@ const flyingEnemies = [
   { name: "dragon.png", width: 120, height: 80 }
 ];
 
-const bgImg = new Image();
-bgImg.src = "background.png";
-const ogreImg = new Image();
-ogreImg.src = "ogre_normal.png";
-const collisionSound = document.getElementById("collisionSound");
-const bgMusic = document.getElementById("bgMusic");
-bgMusic.volume = 0.6;
-
-let fartSound = document.getElementById("fart1");
-
-function playFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-  }
-  currentFart = fartSound.cloneNode();
-  currentFart.play();
-}
-function stopFart() {
-  if (currentFart) {
-    currentFart.pause();
-    currentFart.currentTime = 0;
-    currentFart = null;
-  }
-}
+// New function to make chickens jump every 2 seconds
+let lastChickenJumpTime = 0;
 
 function spawnObstacle() {
   if (obstacles.length + airborneObstacles.length >= maxObstacles) return;
   let obj = groundAnimals[Math.floor(Math.random() * groundAnimals.length)];
   let img = new Image();
   img.src = obj.name;
-  obstacles.push({
-    img,
-    x: width,
-    y: groundLevel - obj.height * 1.4,
-    width: obj.width * 1.4,
-    height: obj.height * 1.4,
-    speed: speed * (0.8 + Math.random() * 0.5)
-  });
+  obstacles.push({ img, x: width, y: groundLevel - obj.height, width: obj.width, height: obj.height, speed: speed * (0.8 + Math.random() * 0.5) });
 }
 
 function spawnFlying() {
@@ -123,41 +103,81 @@ function spawnFlying() {
   let obj = flyingEnemies[Math.floor(Math.random() * flyingEnemies.length)];
   let img = new Image();
   img.src = obj.name;
-  let scale = obj.name.includes("pigeon") ? 1 : 1.4;
-  airborneObstacles.push({
-    img,
-    x: width,
-    y: 100 + Math.random() * (canvas.height / 2 - 100),
-    width: obj.width * scale,
-    height: obj.height * scale,
-    speed: speed * (1 + Math.random() * 0.5)
-  });
+
+  // Height varies between 20% and 80% of the screen height
+  let yPosition = Math.random() * (height * 0.6) + height * 0.2;
+
+  if (obj.name === "dragon.png") {
+    airborneObstacles.push({ img, x: width, y: yPosition, width: obj.width, height: obj.height, speed: speed * (1 + Math.random() * 0.5), angle: 0, isDescending: false });
+  } else {
+    airborneObstacles.push({ img, x: width, y: yPosition, width: obj.width, height: obj.height, speed: speed * (1 + Math.random() * 0.5) });
+  }
 }
 
 function update() {
-  if (!gameStarted || gameOver) return;
+  if (gameOver) return;
+
+  // Poul jumping logic every 2 seconds
+  let currentTime = Date.now();
+  if (currentTime - lastChickenJumpTime > 2000) {
+    lastChickenJumpTime = currentTime;
+    let chicken = airborneObstacles.find(o => o.img.src.includes("poule.png"));
+    if (chicken) {
+      chicken.y -= chicken.height * 10;  // Make the chicken jump 10 times its size
+    }
+  }
 
   if (keyPressed) {
     ogre.vy += ogre.jetpackPower;
-    if (!keyPressedLastFrame) playFart();
+    if (petSound.paused) petSound.play();
     smoke.push({ x: ogre.x + 15, y: ogre.y + ogre.height - 10, radius: 10 });
   }
 
   ogre.vy += ogre.gravity;
   ogre.y += ogre.vy;
 
+  // Collisions haut et bas
   if (ogre.y > groundLevel - ogre.height) {
     ogre.y = groundLevel - ogre.height;
     ogre.vy = 0;
   } else if (ogre.y <= 0) {
     ogre.y = 0;
     gameOver = true;
-    stopFart();
+    petSound.pause();
+    petSound.currentTime = 0;
     collisionSound.play();
-    return endGame();
+    return;
   }
 
   smoke = smoke.map(s => ({ ...s, x: s.x - 1, radius: s.radius - 0.2 })).filter(s => s.radius > 0);
+
+  // Update flying enemies' positions
+  for (let obs of airborneObstacles) {
+    obs.x -= obs.speed;
+
+    if (obs.name === "dragon.png") {
+      // Vary height sinusoidally, within the limits
+      obs.angle += 0.05;
+      let heightOffset = Math.sin(obs.angle) * (obs.height * 0.2);  // Vary height within +/-20% 
+      obs.y = Math.max(0, Math.min(height - obs.height, heightOffset + obs.y));
+
+      // Move faster when descending
+      if (obs.isDescending) {
+        obs.speed = speed * 2;
+        obs.y += 1;
+      } else {
+        obs.speed = speed;
+        obs.y -= 1;
+      }
+
+      // Check if the dragon has reached the top or bottom limit
+      if (obs.y <= 50) {
+        obs.isDescending = true;
+      } else if (obs.y >= height / 2) {
+        obs.isDescending = false;
+      }
+    }
+  }
 
   for (let obs of [...obstacles, ...airborneObstacles]) {
     obs.x -= obs.speed;
@@ -186,26 +206,28 @@ function update() {
       ogreBox.y + ogreBox.height > obsBox.y
     ) {
       collisionSound.play();
-      stopFart();
       gameOver = true;
-      return endGame();
+      petSound.pause();
+      petSound.currentTime = 0;
+      return;
     }
   }
 
   distance += speed / 60 * 3;
   scoreDiv.textContent = Math.floor(distance) + " m";
 
-  const milestone = Math.floor(distance / 100);
-  if (distance - milestone * 100 < speed / 60 * 3) {
+  if (Math.floor(distance) % 100 === 0) {
     if (speed < maxSpeed) speed += 0.2;
-    if (milestone <= 10) {
-      maxObstacles = Math.min(1 + milestone, 10);
-    }
+    if (maxObstacles < 10) maxObstacles++;
+  }
+
+  // Adjust the flying obstacles ratio based on the distance
+  if (distance >= 1000) {
+    airborneProportion = Math.min(0.5, (distance - 1000) / 1000);
   }
 
   if (Math.random() < 0.02) {
-    const ratio = Math.min(distance / 1000, 1) * 0.5;
-    if (Math.random() < ratio) {
+    if (Math.random() < airborneProportion) {
       spawnFlying();
     } else {
       spawnObstacle();
@@ -214,14 +236,25 @@ function update() {
 
   bgScrollX -= speed / 2;
   if (bgScrollX <= -bgImg.width) bgScrollX = 0;
-
-  keyPressedLastFrame = keyPressed;
 }
 
 function draw() {
   ctx.clearRect(0, 0, width, height);
-  ctx.drawImage(bgImg, bgScrollX, 0, bgImg.width, height);
-  ctx.drawImage(bgImg, bgScrollX + bgImg.width, 0, bgImg.width, height);
+
+  if (bgImg.complete) {
+    ctx.drawImage(bgImg, bgScrollX, 0, bgImg.width, height);
+    ctx.drawImage(bgImg, bgScrollX + bgImg.width, 0, bgImg.width, height);
+  }
+
+  if (gameOver) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    ctx.font = "36px sans-serif";
+    ctx.fillText("Game Over!", width / 2 - 100, height / 2 - 20);
+    ctx.fillText("Score: " + Math.floor(distance) + " m", width / 2 - 100, height / 2 + 20);
+    return;
+  }
 
   for (let s of smoke) {
     ctx.fillStyle = "rgba(85,153,68,0.5)";
@@ -246,26 +279,21 @@ function loop() {
 }
 
 document.addEventListener("keydown", e => {
-  if (e.key === " " || e.key === "Spacebar") keyPressed = true;
-});
-document.addEventListener("keyup", e => {
   if (e.key === " " || e.key === "Spacebar") {
-    keyPressed = false;
-    stopFart();
+    keyPressed = true;
   }
 });
 
-function endGame() {
-  scoreDiv.style.display = "none";
-  document.getElementById("gameOverMenu").style.display = "block";
-  const current = Math.floor(distance);
-  const best = Math.max(current, parseInt(localStorage.getItem("bestScore") || "0"));
-  localStorage.setItem("bestScore", best);
-  document.getElementById("finalScore").textContent = "Score: " + current + " m";
-  document.getElementById("bestScore").textContent = "Meilleur score: " + best + " m";
-}
+document.addEventListener("keyup", e => {
+  if (e.key === " " || e.key === "Spacebar") {
+    keyPressed = false;
+    petSound.pause();
+    petSound.currentTime = 0;
+  }
+});
 
 window.addEventListener("resize", () => location.reload());
+
 loop();
 </script>
 </body>
